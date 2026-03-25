@@ -61,18 +61,21 @@ const textInputTranslations = {
     submit: "వెతుకు",
     voiceNotAvailable: "ఈ పరికరంలో వాయిస్ అందుబాటులో లేదు. టైప్ చేయండి:",
     examples: "ఉదా: ఘాట్లు, భోజనం, టాయిలెట్, నీరు, బస్",
+    typeInstead: "టైప్ చేయండి",
   },
   hi: {
     placeholder: "यहाँ टाइप करें... (घाट, खाना, टॉयलेट...)",
     submit: "खोजें",
     voiceNotAvailable: "इस डिवाइस पर वॉइस उपलब्ध नहीं। टाइप करें:",
     examples: "जैसे: घाट, खाना, टॉयलेट, पानी, बस",
+    typeInstead: "टाइप करें",
   },
   en: {
     placeholder: "Type here... (ghats, food, toilet...)",
     submit: "Search",
     voiceNotAvailable: "Voice not available on this device. Type instead:",
     examples: "e.g. ghats, food, toilet, water, bus",
+    typeInstead: "Type instead",
   },
 };
 
@@ -429,21 +432,56 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
               </div>
 
               {/* Buttons */}
-              <div className="mt-6 flex gap-3">
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
                 {state === "error" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        retryCountRef.current = 0;
+                        beginListening();
+                      }}
+                      className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+                      style={{
+                        background: "linear-gradient(135deg, #ffbe20, #e65100)",
+                        color: "white",
+                        boxShadow: "0 4px 15px rgba(230,81,0,0.3)",
+                      }}
+                    >
+                      {t.tryAgain}
+                    </button>
+                    <button
+                      onClick={() => {
+                        cleanup();
+                        setState("idle");
+                        setErrorMessage("");
+                        setSpeechAvailable(false);
+                        setTimeout(() => textInputRef.current?.focus(), 100);
+                      }}
+                      className="px-5 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium hover:bg-white/25 transition-colors flex items-center gap-1.5"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 16h8" />
+                      </svg>
+                      {tt.typeInstead}
+                    </button>
+                  </>
+                )}
+                {!state.startsWith("error") && (
                   <button
                     onClick={() => {
-                      retryCountRef.current = 0;
-                      beginListening();
+                      cleanup();
+                      setState("idle");
+                      setSpeechAvailable(false);
+                      setTimeout(() => textInputRef.current?.focus(), 100);
                     }}
-                    className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
-                    style={{
-                      background: "linear-gradient(135deg, #ffbe20, #e65100)",
-                      color: "white",
-                      boxShadow: "0 4px 15px rgba(230,81,0,0.3)",
-                    }}
+                    className="px-4 py-2 rounded-full bg-white/10 text-white/50 text-xs font-medium hover:bg-white/15 transition-colors flex items-center gap-1.5"
                   >
-                    {t.tryAgain}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 16h8" />
+                    </svg>
+                    {tt.typeInstead}
                   </button>
                 )}
                 <button
@@ -507,13 +545,33 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                 <p className="text-red-300 text-sm font-medium text-center mt-2">{errorMessage}</p>
               )}
 
-              {/* Cancel */}
-              <button
-                onClick={handleClose}
-                className="mt-4 px-5 py-2.5 rounded-full bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors"
-              >
-                {t.cancel}
-              </button>
+              {/* Cancel + switch to mic */}
+              <div className="mt-4 flex gap-3 justify-center">
+                {isSpeechSupported() && (
+                  <button
+                    onClick={() => {
+                      setSpeechAvailable(true);
+                      setErrorMessage("");
+                      setTextInput("");
+                      retryCountRef.current = 0;
+                      setTimeout(() => beginListening(), 100);
+                    }}
+                    className="px-4 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium hover:bg-white/25 transition-colors flex items-center gap-1.5"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="1" width="6" height="12" rx="3" />
+                      <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                    </svg>
+                    {t.tryAgain}
+                  </button>
+                )}
+                <button
+                  onClick={handleClose}
+                  className="px-5 py-2.5 rounded-full bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors"
+                >
+                  {t.cancel}
+                </button>
+              </div>
             </>
           )}
         </div>

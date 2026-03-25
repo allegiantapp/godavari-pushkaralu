@@ -357,6 +357,25 @@ const fillerWords = new Set([
   "का", "की", "के", "को", "से", "पर", "और", "या",
 ]);
 
+/**
+ * Simple similarity check: how many characters match between two strings.
+ * Returns a score from 0 to 1. Used for fuzzy matching when exact match fails.
+ */
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1;
+  // Check if shorter is contained in longer
+  if (longer.includes(shorter)) return shorter.length / longer.length;
+  // Check character overlap
+  let matches = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer.includes(shorter[i])) matches++;
+  }
+  return matches / longer.length;
+}
+
 export function parseIntent(transcript: string, lang: Lang): VoiceIntent | null {
   const text = transcript.toLowerCase().trim();
   if (!text) return null;
@@ -368,7 +387,7 @@ export function parseIntent(transcript: string, lang: Lang): VoiceIntent | null 
   // This allows Telugu speech to work even in English mode, etc.
   const allLangs: Lang[] = ["te", "hi", "en"];
 
-  // First pass: check if any keyword appears in the transcript
+  // First pass: exact substring match — check if any keyword appears in the transcript
   for (const entry of intents) {
     for (const kl of allLangs) {
       for (const keyword of entry.keywords[kl]) {
@@ -379,7 +398,7 @@ export function parseIntent(transcript: string, lang: Lang): VoiceIntent | null 
     }
   }
 
-  // Second pass: extract meaningful words (remove fillers) and try matching
+  // Second pass: partial word match (handles plurals, conjugations, extra suffixes)
   const meaningfulWords = words.filter((w) => !fillerWords.has(w) && w.length > 1);
   if (meaningfulWords.length > 0) {
     for (const entry of intents) {
@@ -387,11 +406,16 @@ export function parseIntent(transcript: string, lang: Lang): VoiceIntent | null 
 
       for (const word of meaningfulWords) {
         for (const keyword of allKeywords) {
-          // Partial match: word starts with keyword or keyword starts with word (for plural/conjugation)
-          if (
-            word.startsWith(keyword.toLowerCase()) ||
-            keyword.toLowerCase().startsWith(word)
-          ) {
+          const kw = keyword.toLowerCase();
+          // Partial match: word starts with keyword or keyword starts with word
+          if (word.startsWith(kw) || kw.startsWith(word)) {
+            return entry.result;
+          }
+          // Contains match: keyword of 4+ chars found within a longer word
+          if (kw.length >= 4 && word.includes(kw)) {
+            return entry.result;
+          }
+          if (word.length >= 4 && kw.includes(word)) {
             return entry.result;
           }
         }
@@ -399,12 +423,53 @@ export function parseIntent(transcript: string, lang: Lang): VoiceIntent | null 
     }
   }
 
+  // Third pass: fuzzy match — speech recognition often garbles words slightly
+  // Score each intent and pick the best match above threshold
+  let bestScore = 0;
+  let bestIntent: VoiceIntent | null = null;
+
+  for (const entry of intents) {
+    const allKeywords = allLangs.flatMap((kl) => entry.keywords[kl]);
+    let intentScore = 0;
+
+    for (const word of meaningfulWords) {
+      for (const keyword of allKeywords) {
+        const kw = keyword.toLowerCase();
+        // Only fuzzy match words that are reasonably long
+        if (word.length >= 3 && kw.length >= 3) {
+          const sim = similarity(word, kw);
+          if (sim > 0.7) {
+            intentScore = Math.max(intentScore, sim);
+          }
+        }
+      }
+    }
+
+    if (intentScore > bestScore) {
+      bestScore = intentScore;
+      bestIntent = entry.result;
+    }
+  }
+
+  if (bestIntent && bestScore > 0.7) {
+    return bestIntent;
+  }
+
   return null;
 }
 
-// Check if Web Speech API is supported
+// Detect iOS (Safari on iOS has webkitSpeechRecognition but it doesn't work)
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+// Check if Web Speech API is actually supported and working
 export function isSpeechSupported(): boolean {
   if (typeof window === "undefined") return false;
+  // iOS Safari has webkitSpeechRecognition but it doesn't work reliably
+  if (isIOS()) return false;
   return !!(
     (window as unknown as Record<string, unknown>).SpeechRecognition ||
     (window as unknown as Record<string, unknown>).webkitSpeechRecognition
