@@ -486,6 +486,52 @@ export function startListening(
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
+ * Ensure voices are loaded. On mobile browsers, getVoices() returns empty
+ * until the voiceschanged event fires. This waits for voices to be available.
+ */
+let voicesReady = false;
+let voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
+
+function ensureVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    return Promise.resolve([]);
+  }
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    voicesReady = true;
+    return Promise.resolve(voices);
+  }
+
+  if (voicesReady) return Promise.resolve(voices);
+
+  if (!voicesPromise) {
+    voicesPromise = new Promise((resolve) => {
+      const onVoicesChanged = () => {
+        voicesReady = true;
+        voicesPromise = null;
+        window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+        resolve(window.speechSynthesis.getVoices());
+      };
+      window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
+      // Timeout fallback — some browsers never fire voiceschanged
+      setTimeout(() => {
+        voicesReady = true;
+        voicesPromise = null;
+        resolve(window.speechSynthesis.getVoices());
+      }, 1000);
+    });
+  }
+
+  return voicesPromise;
+}
+
+// Pre-load voices as early as possible
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  ensureVoices();
+}
+
+/**
  * Speak text aloud. If the requested language voice isn't available
  * (e.g. no Telugu voice on Windows), falls back to English.
  * Pass `fallbackText` for the English fallback version.
@@ -506,26 +552,45 @@ export function speak(
 
     const langCode = ttsLangCodes[lang];
 
-    // Find a voice that matches the requested language
-    const voices = window.speechSynthesis.getVoices();
-    const matchingVoice = voices.find((v) => v.lang.startsWith(langCode.split("-")[0]));
+    const doSpeak = (voices: SpeechSynthesisVoice[]) => {
+      // Find a voice that matches the requested language
+      const matchingVoice = voices.find((v) => v.lang.startsWith(langCode.split("-")[0]));
 
-    // If no matching voice found and we have a fallback, use English
-    const useEnglish = !matchingVoice && lang !== "en" && fallbackText;
-    const finalText = useEnglish ? fallbackText : text;
-    const finalLang = useEnglish ? "en-IN" : langCode;
+      // If no matching voice found and we have a fallback, use English
+      const useEnglish = !matchingVoice && lang !== "en" && fallbackText;
+      const finalText = useEnglish ? fallbackText : text;
+      const finalLang = useEnglish ? "en-IN" : langCode;
 
-    const utterance = new SpeechSynthesisUtterance(finalText);
-    utterance.lang = finalLang;
-    if (matchingVoice && !useEnglish) utterance.voice = matchingVoice;
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 1;
+      const utterance = new SpeechSynthesisUtterance(finalText);
+      utterance.lang = finalLang;
+      if (matchingVoice && !useEnglish) utterance.voice = matchingVoice;
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
 
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
 
-    window.speechSynthesis.speak(utterance);
+      // Mobile Chrome workaround: speechSynthesis can get stuck.
+      // Resume it before speaking.
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+        // Android Chrome bug: speech can pause after ~15s. Keep it alive.
+        const keepAlive = setInterval(() => {
+          if (!window.speechSynthesis.speaking) {
+            clearInterval(keepAlive);
+          } else {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          }
+        }, 5000);
+        utterance.onend = () => { clearInterval(keepAlive); resolve(); };
+        utterance.onerror = () => { clearInterval(keepAlive); resolve(); };
+      }, 50);
+    };
+
+    ensureVoices().then(doSpeak);
   });
 }
 

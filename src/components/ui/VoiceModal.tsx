@@ -250,6 +250,14 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
   useEffect(() => {
     if (open) {
       retryCountRef.current = 0;
+      // Warm up TTS on user gesture context — mobile browsers require
+      // speechSynthesis.speak() to be called from a user interaction first.
+      // Speaking an empty utterance "unlocks" TTS for subsequent calls.
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        const warmup = new SpeechSynthesisUtterance("");
+        warmup.volume = 0;
+        window.speechSynthesis.speak(warmup);
+      }
       const timer = setTimeout(() => {
         beginListening();
       }, 300);
