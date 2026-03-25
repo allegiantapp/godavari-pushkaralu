@@ -86,7 +86,8 @@ export function startRecording(
 
         if (stopped && chunks.length === 0) return;
 
-        const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+        const actualMime = mimeType || mediaRecorder?.mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type: actualMime });
 
         // Convert to base64
         const reader = new FileReader();
@@ -101,7 +102,7 @@ export function startRecording(
             const response = await fetch("/api/speech", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ audio: base64, lang }),
+              body: JSON.stringify({ audio: base64, lang, mimeType: actualMime }),
             });
 
             if (!response.ok) {
@@ -127,8 +128,8 @@ export function startRecording(
         onError("recorder_error");
       };
 
-      // Start recording
-      mediaRecorder.start();
+      // Start recording with timeslice to ensure data is captured in chunks
+      mediaRecorder.start(1000);
 
       // Auto-stop after maxDuration
       timeoutId = setTimeout(() => {
