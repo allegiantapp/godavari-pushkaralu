@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const GOOGLE_API_KEY = process.env.GOOGLE_SPEECH_API_KEY;
 const GOOGLE_TTS_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`;
 
-// Google Cloud TTS voice names — neural/WaveNet voices for best quality
+// Google Cloud TTS voice names — Chirp3-HD (best quality, most natural)
 const voiceMap: Record<string, { languageCode: string; name: string }> = {
-  te: { languageCode: "te-IN", name: "te-IN-Standard-A" },
-  hi: { languageCode: "hi-IN", name: "hi-IN-Neural2-A" },
-  en: { languageCode: "en-IN", name: "en-IN-Neural2-A" },
+  te: { languageCode: "te-IN", name: "te-IN-Chirp3-HD-Achernar" },
+  hi: { languageCode: "hi-IN", name: "hi-IN-Chirp3-HD-Achernar" },
+  en: { languageCode: "en-IN", name: "en-IN-Chirp3-HD-Achernar" },
 };
 
 export async function POST(request: NextRequest) {
