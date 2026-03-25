@@ -550,112 +550,102 @@ export function startListening(
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/**
- * Ensure voices are loaded. On mobile browsers, getVoices() returns empty
- * until the voiceschanged event fires. This waits for voices to be available.
- */
-let voicesReady = false;
-let voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
-
-function ensureVoices(): Promise<SpeechSynthesisVoice[]> {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    return Promise.resolve([]);
-  }
-
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    voicesReady = true;
-    return Promise.resolve(voices);
-  }
-
-  if (voicesReady) return Promise.resolve(voices);
-
-  if (!voicesPromise) {
-    voicesPromise = new Promise((resolve) => {
-      const onVoicesChanged = () => {
-        voicesReady = true;
-        voicesPromise = null;
-        window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
-        resolve(window.speechSynthesis.getVoices());
-      };
-      window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
-      // Timeout fallback — some browsers never fire voiceschanged
-      setTimeout(() => {
-        voicesReady = true;
-        voicesPromise = null;
-        resolve(window.speechSynthesis.getVoices());
-      }, 1000);
-    });
-  }
-
-  return voicesPromise;
-}
-
-// Pre-load voices as early as possible
-if (typeof window !== "undefined" && window.speechSynthesis) {
-  ensureVoices();
-}
+// Current audio element for cloud TTS playback
+let currentAudio: HTMLAudioElement | null = null;
 
 /**
- * Speak text aloud. If the requested language voice isn't available
- * (e.g. no Telugu voice on Windows), falls back to English.
- * Pass `fallbackText` for the English fallback version.
+ * Speak text aloud using Google Cloud TTS (high-quality neural voices).
+ * Falls back to browser TTS if the API call fails.
+ * Pass `fallbackText` for English fallback when the language voice isn't available.
  */
 export function speak(
   text: string,
   lang: Lang,
   fallbackText?: string
 ): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
+  return new Promise(async (resolve) => {
+    if (typeof window === "undefined") {
       resolve();
       return;
     }
 
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
+    // Stop any currently playing audio
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Try cloud TTS first (much better quality)
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.audio) {
+          const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+          currentAudio = audio;
+          audio.onended = () => { currentAudio = null; resolve(); };
+          audio.onerror = () => { currentAudio = null; resolve(); };
+          audio.play().catch(() => {
+            // Autoplay blocked — fall back to browser TTS
+            currentAudio = null;
+            speakWithBrowser(text, lang, fallbackText).then(resolve);
+          });
+          return;
+        }
+      }
+    } catch {
+      // Cloud TTS failed, fall back to browser TTS
+    }
+
+    // Fallback: browser TTS
+    speakWithBrowser(text, lang, fallbackText).then(resolve);
+  });
+}
+
+/**
+ * Browser-based TTS fallback (lower quality but works offline)
+ */
+function speakWithBrowser(
+  text: string,
+  lang: Lang,
+  fallbackText?: string
+): Promise<void> {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) {
+      resolve();
+      return;
+    }
 
     const langCode = ttsLangCodes[lang];
+    const voices = window.speechSynthesis.getVoices();
+    const matchingVoice = voices.find((v) => v.lang.startsWith(langCode.split("-")[0]));
 
-    const doSpeak = (voices: SpeechSynthesisVoice[]) => {
-      // Find a voice that matches the requested language
-      const matchingVoice = voices.find((v) => v.lang.startsWith(langCode.split("-")[0]));
+    const useEnglish = !matchingVoice && lang !== "en" && fallbackText;
+    const finalText = useEnglish ? fallbackText : text;
+    const finalLang = useEnglish ? "en-IN" : langCode;
 
-      // If no matching voice found and we have a fallback, use English
-      const useEnglish = !matchingVoice && lang !== "en" && fallbackText;
-      const finalText = useEnglish ? fallbackText : text;
-      const finalLang = useEnglish ? "en-IN" : langCode;
+    const utterance = new SpeechSynthesisUtterance(finalText);
+    utterance.lang = finalLang;
+    if (matchingVoice && !useEnglish) utterance.voice = matchingVoice;
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
 
-      const utterance = new SpeechSynthesisUtterance(finalText);
-      utterance.lang = finalLang;
-      if (matchingVoice && !useEnglish) utterance.voice = matchingVoice;
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 1;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
 
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      // Mobile Chrome workaround: speechSynthesis can get stuck.
-      // Resume it before speaking.
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        window.speechSynthesis.speak(utterance);
-        // Android Chrome bug: speech can pause after ~15s. Keep it alive.
-        const keepAlive = setInterval(() => {
-          if (!window.speechSynthesis.speaking) {
-            clearInterval(keepAlive);
-          } else {
-            window.speechSynthesis.pause();
-            window.speechSynthesis.resume();
-          }
-        }, 5000);
-        utterance.onend = () => { clearInterval(keepAlive); resolve(); };
-        utterance.onerror = () => { clearInterval(keepAlive); resolve(); };
-      }, 50);
-    };
-
-    ensureVoices().then(doSpeak);
+    window.speechSynthesis.cancel();
+    setTimeout(() => {
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   });
 }
 
