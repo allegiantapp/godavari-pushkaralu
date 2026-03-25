@@ -1,0 +1,7 @@
+id,type,title_te,title_hi,title_en,message_te,message_hi,message_en,time,active
+1,crowd,తక్కువ రద్దీ,कम भीड़,Low Crowd Alert,పుష్కర్ ఘాట్ వద్ద తక్కువ రద్దీ ఉంది. సురక్షితంగా స్నానం చేయవచ్చు.,पुष्कर घाट पर कम भीड़ है। सुरक्षित रूप से स्नान कर सकते हैं।,Low crowd at Pushkar Ghat. Safe for bathing.,10 min,TRUE
+2,crowd,ఎక్కువ రద్దీ హెచ్చరిక,अधिक भीड़ चेतावनी,High Crowd Warning,గౌతమి ఘాట్ వద్ద ఎక్కువ రద్దీ ఉంది. దయచేసి వేరే ఘాట్ ఎంచుకోండి.,गौतमी घाट पर अधिक भीड़ है। कृपया अन्य घाट चुनें।,High crowd at Gautami Ghat. Please choose another ghat.,25 min,TRUE
+3,weather,వాతావరణ హెచ్చరిక,मौसम चेतावनी,Weather Advisory,మధ్యాహ్నం 2 గంటల తర్వాత వర్షం పడే అవకాశం ఉంది. గొడుగులు తీసుకెళ్ళండి.,दोपहर 2 बजे के बाद बारिश की संभावना है। छाता लेकर जाएं।,Rain expected after 2 PM. Carry umbrellas.,1 hr,TRUE
+4,safety,భద్రతా సూచన,सुरक्षा सूचना,Safety Notice,ఘాట్ మెట్లపై జాగ్రత్తగా నడవండి. తడి మెట్లపై జారవచ్చు.,घाट सीढ़ियों पर सावधानी से चलें। गीली सीढ़ियाँ फिसलन भरी हो सकती हैं।,Walk carefully on ghat steps. Wet steps can be slippery.,2 hr,TRUE
+5,info,పుష్కరాల కార్యక్రమం,पुष्करालु कार्यक्रम,Pushkaralu Schedule,సాయంత్రం 6 గంటలకు మహా హారతి పుష్కర్ ఘాట్ వద్ద జరుగుతుంది.,शाम 6 बजे महा आरती पुष्कर घाट पर होगी।,Maha Harati at Pushkar Ghat at 6 PM today.,3 hr,TRUE
+6,safety,నీటి నాణ్యత,पानी की गुणवत्ता,Water Quality Update,అన్ని ఘాట్ల వద్ద నీటి నాణ్యత మంచిగా ఉంది. స్నానానికి అనుకూలం.,सभी घाटों पर पानी की गुणवत्ता अच्छी है। स्नान के लिए उपयुक्त।,Water quality is good at all ghats. Suitable for bathing.,5 hr,FALSE

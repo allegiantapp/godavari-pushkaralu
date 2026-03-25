@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+:root {
+  /* Sacred Color Palette */
+  --godavari-50: #eff8ff;
+  --godavari-100: #dbeffe;
+  --godavari-200: #bfe3fe;
+  --godavari-300: #93d2fd;
+  --godavari-400: #60b8fa;
+  --godavari-500: #3b99f5;
+  --godavari-600: #1e6fd0;
+  --godavari-700: #1b5bae;
+  --godavari-800: #1c4d8f;
+  --godavari-900: #1a3f6e;
+  --godavari-950: #0f2847;
+
+  /* Saffron / Gold - Spiritual accent */
+  --saffron-50: #fffbeb;
+  --saffron-100: #fff3c6;
+  --saffron-200: #ffe588;
+  --saffron-300: #ffd24a;
+  --saffron-400: #ffbe20;
+  --saffron-500: #f99b07;
+  --saffron-600: #dd7302;
+  --saffron-700: #b74f06;
+  --saffron-800: #943c0c;
+  --saffron-900: #7a320d;
+  --saffron-950: #461802;
+
+  /* Sacred Maroon */
+  --maroon-50: #fef2f2;
+  --maroon-100: #fee2e2;
+  --maroon-200: #fecaca;
+  --maroon-300: #fca5a5;
+  --maroon-400: #f87171;
+  --maroon-500: #ef4444;
+  --maroon-600: #dc2626;
+  --maroon-700: #b91c1c;
+  --maroon-800: #991b1b;
+  --maroon-900: #7f1d1d;
+
+  /* Semantic */
+  --success: #16a34a;
+  --warning: #eab308;
+  --danger: #dc2626;
+  --info: var(--godavari-500);
+
+  /* Background & Text */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: #e2e8f0;
+}
+
+@theme inline {
+  --color-godavari-50: var(--godavari-50);
+  --color-godavari-100: var(--godavari-100);
+  --color-godavari-200: var(--godavari-200);
+  --color-godavari-300: var(--godavari-300);
+  --color-godavari-400: var(--godavari-400);
+  --color-godavari-500: var(--godavari-500);
+  --color-godavari-600: var(--godavari-600);
+  --color-godavari-700: var(--godavari-700);
+  --color-godavari-800: var(--godavari-800);
+  --color-godavari-900: var(--godavari-900);
+  --color-godavari-950: var(--godavari-950);
+
+  --color-saffron-50: var(--saffron-50);
+  --color-saffron-100: var(--saffron-100);
+  --color-saffron-200: var(--saffron-200);
+  --color-saffron-300: var(--saffron-300);
+  --color-saffron-400: var(--saffron-400);
+  --color-saffron-500: var(--saffron-500);
+  --color-saffron-600: var(--saffron-600);
+  --color-saffron-700: var(--saffron-700);
+  --color-saffron-800: var(--saffron-800);
+  --color-saffron-900: var(--saffron-900);
+  --color-saffron-950: var(--saffron-950);
+
+  --color-maroon-50: var(--maroon-50);
+  --color-maroon-100: var(--maroon-100);
+  --color-maroon-200: var(--maroon-200);
+  --color-maroon-300: var(--maroon-300);
+  --color-maroon-400: var(--maroon-400);
+  --color-maroon-500: var(--maroon-500);
+  --color-maroon-600: var(--maroon-600);
+  --color-maroon-700: var(--maroon-700);
+  --color-maroon-800: var(--maroon-800);
+  --color-maroon-900: var(--maroon-900);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+}
+
+/* Base styles */
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Mobile app-like container */
+.app-container {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Match body bg to app content so no side gaps are visible */
+body {
+  background: var(--godavari-950);
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for mobile feel */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sacred gradient backgrounds */
+.gradient-sacred {
+  background: linear-gradient(135deg, var(--godavari-900) 0%, var(--godavari-700) 50%, var(--godavari-800) 100%);
+}
+
+.gradient-saffron {
+  background: linear-gradient(135deg, var(--saffron-500) 0%, var(--saffron-600) 100%);
+}
+
+.gradient-hero {
+  background: linear-gradient(180deg, var(--godavari-950) 0%, var(--godavari-800) 40%, var(--godavari-600) 100%);
+}
+
+/* Warm sunset gradient for splash */
+.gradient-sunset {
+  background: linear-gradient(180deg, #1a0a2e 0%, #6b2fa0 20%, #c2185b 40%, #e65100 55%, #f57c00 65%, #ff9800 75%, #ffb74d 85%, #ffe0b2 95%);
+}
+
+/* Pulse animation for mic button */
+@keyframes sacred-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 190, 32, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(255, 190, 32, 0);
+  }
+}
+
+.animate-sacred-pulse {
+  animation: sacred-pulse 2s ease-in-out infinite;
+}
+
+/* Water ripple effect */
+@keyframes ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 2s ease-out infinite;
+}
+
+/* Subtle float animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Safe area padding for mobile */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Fade-in up for staggered content */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out both;
+}
+
+/* Gentle shimmer for sacred elements */
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* Slow drift for floating elements on water */
+@keyframes drift {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(4px) translateY(-2px);
+  }
+  75% {
+    transform: translateX(-4px) translateY(2px);
+  }
+}
+
+.animate-drift {
+  animation: drift 6s ease-in-out infinite;
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - Godavari Pushkaralu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0f2847 0%, #1a3f6e 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .container { text-align: center; max-width: 360px; }
+    .icon { font-size: 3.5rem; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; font-weight: 700; }
+    .sub { font-size: 0.875rem; color: rgba(255,255,255,0.6); margin-bottom: 0.5rem; }
+    .hint { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-bottom: 2rem; line-height: 1.6; }
+    button {
+      background: linear-gradient(135deg, #f99b07, #dd7302);
+      color: white;
+      border: none;
+      padding: 0.875rem 2.5rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(249,155,7,0.3);
+    }
+    button:active { transform: scale(0.97); }
+    .emergency {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .emergency p { font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 0.75rem; }
+    .emergency a {
+      display: inline-block;
+      background: rgba(220,38,38,0.2);
+      border: 1px solid rgba(220,38,38,0.4);
+      color: #fca5a5;
+      padding: 0.5rem 1.25rem;
+      border-radius: 0.5rem;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>మీరు ఆఫ్‌లైన్‌లో ఉన్నారు</h1>
+    <p class="sub">You are offline</p>
+    <p class="hint">దయచేసి ఇంటర్నెట్ కనెక్షన్ తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి<br>Please check your connection and try again</p>
+    <button onclick="window.location.reload()">Retry / మళ్ళీ ప్రయత్నించండి</button>
+    <div class="emergency">
+      <p>Emergency? Call directly:</p>
+      <a href="tel:100">🚨 Police 100</a>&nbsp;
+      <a href="tel:108">🚑 Ambulance 108</a>
+    </div>
+  </div>
+</body>
+</html>
