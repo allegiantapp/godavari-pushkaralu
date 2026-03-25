@@ -254,7 +254,7 @@ export default function HomeClient({ lang }: { lang: string }) {
       </header>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 overflow-x-hidden">
         {/* ===== VOICE HERO — Sunset sky gradient ===== */}
         <div
           className="px-5 pt-6 pb-10 flex flex-col items-center relative overflow-hidden"
