@@ -650,6 +650,28 @@ function speakWithBrowser(
 }
 
 /**
+ * Format distance for speech — uses full words instead of abbreviations.
+ * e.g. 1.2km → "1.2 కిలోమీటర్లు" (Telugu), "1.2 kilometers" (English)
+ */
+function spokenDistance(km: number, lang: Lang): string {
+  const units: Record<Lang, { m: string; km: string }> = {
+    te: { m: "మీటర్లు", km: "కిలోమీటర్లు" },
+    hi: { m: "मीटर", km: "किलोमीटर" },
+    en: { m: "meters", km: "kilometers" },
+  };
+
+  const u = units[lang];
+  if (km < 1) {
+    const meters = Math.round(km * 1000);
+    return `${meters} ${u.m}`;
+  }
+  if (km < 10) {
+    return `${km.toFixed(1)} ${u.km}`;
+  }
+  return `${Math.round(km)} ${u.km}`;
+}
+
+/**
  * Generate a dynamic voice response using live ghat data and GPS location.
  * Falls back to the static dataResponse if no live data is available.
  */
@@ -667,20 +689,12 @@ export function buildDynamicResponse(
     en: { low: "low crowd", medium: "moderate crowd", high: "high crowd" },
   };
 
-  // Helper: build a response listing top items
-  const listItems = (
-    items: { name: { te: string; hi: string; en: string }; realDistLabel: string; extra?: string }[],
-    limit = 2
-  ) => {
-    return items.slice(0, limit).map((it) => `${it.name[l]} ${it.realDistLabel}${it.extra ? ` ${it.extra}` : ""}`).join(". ");
-  };
-
   if (intent.intent === "ghats" || intent.intent === "crowd") {
     if (ghats.length > 0) {
       const sorted = [...ghats].sort((a, b) => a.realDist - b.realDist);
       const top = sorted.slice(0, 2);
-      const text = top.map((g) => `${g.name[l]} ${g.realDistLabel} ${crowdWord[l][g.crowd]}`).join(". ") + ".";
-      const fallback = top.map((g) => `${g.name["en"]} ${g.realDistLabel} ${crowdWord["en"][g.crowd]}`).join(". ") + ".";
+      const text = top.map((g) => `${g.name[l]}, ${spokenDistance(g.realDist, l)}, ${crowdWord[l][g.crowd]}`).join(". ") + ".";
+      const fallback = top.map((g) => `${g.name["en"]}, ${spokenDistance(g.realDist, "en")}, ${crowdWord["en"][g.crowd]}`).join(". ") + ".";
       return { text, fallback };
     }
   }
@@ -690,8 +704,8 @@ export function buildDynamicResponse(
     const cat = catMap[intent.intent];
     const matching = facilities.filter((f) => f.category === cat).sort((a, b) => a.realDist - b.realDist);
     if (matching.length > 0) {
-      const text = listItems(matching) + ".";
-      const fallback = matching.slice(0, 2).map((f) => `${f.name["en"]} ${f.realDistLabel}`).join(". ") + ".";
+      const text = matching.slice(0, 2).map((f) => `${f.name[l]}, ${spokenDistance(f.realDist, l)}`).join(". ") + ".";
+      const fallback = matching.slice(0, 2).map((f) => `${f.name["en"]}, ${spokenDistance(f.realDist, "en")}`).join(". ") + ".";
       return { text, fallback };
     }
   }
