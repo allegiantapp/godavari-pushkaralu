@@ -10,9 +10,15 @@ import {
   type VoiceIntent,
   type VoiceSession,
 } from "@/lib/voiceAssistant";
+import {
+  isMediaRecorderSupported,
+  startRecording,
+  type RecordingSession,
+} from "@/lib/audioRecorder";
 
 type Lang = "te" | "hi" | "en";
 type VoiceState = "idle" | "listening" | "processing" | "error";
+type VoiceMode = "native" | "cloud" | "text";
 
 interface VoiceModalProps {
   lang: string;
@@ -81,6 +87,18 @@ const textInputTranslations = {
 
 const MAX_RETRIES = 2;
 
+/**
+ * Determine the best voice mode for this device:
+ * - "native": Web Speech API works (Chrome Android/Desktop)
+ * - "cloud": No native speech, but MediaRecorder works (iOS Safari, Firefox)
+ * - "text": Nothing works, fall back to typing
+ */
+function detectVoiceMode(): VoiceMode {
+  if (isSpeechSupported()) return "native";
+  if (isMediaRecorderSupported()) return "cloud";
+  return "text";
+}
+
 export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceModalProps) {
   const l = (lang as Lang) || "te";
   const t = voiceTranslations[l];
@@ -90,8 +108,9 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
   const [transcript, setTranscript] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [textInput, setTextInput] = useState("");
-  const [speechAvailable, setSpeechAvailable] = useState(true);
+  const [mode, setMode] = useState<VoiceMode>("native");
   const sessionRef = useRef<VoiceSession | null>(null);
+  const recordingRef = useRef<RecordingSession | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gotResultRef = useRef(false);
   const retryCountRef = useRef(0);
@@ -102,15 +121,19 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
   onNavigateRef.current = onNavigate;
   onCloseRef.current = onClose;
 
-  // Check speech support on mount
+  // Detect best voice mode on mount
   useEffect(() => {
-    setSpeechAvailable(isSpeechSupported());
+    setMode(detectVoiceMode());
   }, []);
 
   const cleanup = useCallback(() => {
     if (sessionRef.current) {
       sessionRef.current.stop();
       sessionRef.current = null;
+    }
+    if (recordingRef.current) {
+      recordingRef.current.stop();
+      recordingRef.current = null;
     }
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -129,6 +152,28 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
     onCloseRef.current();
   }, [cleanup]);
 
+  // Process a transcript (from either native or cloud speech)
+  const processTranscript = useCallback((text: string) => {
+    setTranscript(text);
+    setState("processing");
+
+    const intent = parseIntent(text, l);
+    if (intent) {
+      cleanup();
+      setState("idle");
+      setTranscript("");
+      setErrorMessage("");
+      gotResultRef.current = false;
+      retryCountRef.current = 0;
+      onCloseRef.current();
+      onNavigateRef.current(intent.route, intent);
+    } else {
+      setState("error");
+      setErrorMessage(`${t.notUnderstood}\n\n"${text}"`);
+      speak(t.notUnderstood, l);
+    }
+  }, [l, t, cleanup]);
+
   // Handle text input submission
   const handleTextSubmit = useCallback(() => {
     const text = textInput.trim();
@@ -144,20 +189,46 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
     }
   }, [textInput, l, t]);
 
-  const beginListening = useCallback(() => {
-    if (!isSpeechSupported()) {
-      setSpeechAvailable(false);
-      // Focus text input instead
-      setTimeout(() => textInputRef.current?.focus(), 100);
-      return;
-    }
+  // Start cloud recording (iOS, Firefox)
+  const beginCloudListening = useCallback(() => {
+    setTranscript("");
+    setErrorMessage("");
+    setState("listening");
 
+    const session = startRecording(
+      l,
+      // onTranscript
+      (text) => {
+        recordingRef.current = null;
+        processTranscript(text);
+      },
+      // onError
+      (error) => {
+        recordingRef.current = null;
+        if (error === "not_allowed") {
+          setState("error");
+          setErrorMessage(t.micBlocked);
+        } else if (error === "no_speech") {
+          setState("error");
+          setErrorMessage(t.noSpeech);
+        } else {
+          setState("error");
+          setErrorMessage(t.noSpeech);
+        }
+      },
+      7000 // 7 second max recording
+    );
+
+    recordingRef.current = session;
+  }, [l, t, processTranscript]);
+
+  // Start native listening (Chrome Android/Desktop)
+  const beginNativeListening = useCallback(() => {
     setTranscript("");
     setErrorMessage("");
     gotResultRef.current = false;
     setState("listening");
 
-    // Only set the master timeout on the first attempt (not retries)
     if (retryCountRef.current === 0) {
       listenStartRef.current = Date.now();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -166,7 +237,6 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
           sessionRef.current.stop();
           sessionRef.current = null;
         }
-        // Force error if still no result after 10s
         if (!gotResultRef.current) {
           setState("error");
           setErrorMessage(t.noSpeech);
@@ -176,51 +246,29 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
 
     const session = startListening(
       l,
-      // onTranscript
       (text, isFinal) => {
         setTranscript(text);
         if (isFinal) {
           gotResultRef.current = true;
-          setState("processing");
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
-
-          const intent = parseIntent(text, l);
-          if (intent) {
-            if (sessionRef.current) {
-              sessionRef.current.stop();
-              sessionRef.current = null;
-            }
-            setState("idle");
-            setTranscript("");
-            setErrorMessage("");
-            gotResultRef.current = false;
-            retryCountRef.current = 0;
-            onCloseRef.current();
-            onNavigateRef.current(intent.route, intent);
-          } else {
-            setState("error");
-            setErrorMessage(`${t.notUnderstood}\n\n"${text}"`);
-            speak(t.notUnderstood, l);
+          if (sessionRef.current) {
+            sessionRef.current.stop();
+            sessionRef.current = null;
           }
+          processTranscript(text);
         }
       },
-      // onEnd — recognition session ended naturally
       () => {
         sessionRef.current = null;
-
-        // If we got a result, do nothing (already handled in onTranscript)
         if (gotResultRef.current) return;
 
-        // Check if we're still within the 10s timeout window
         const elapsed = Date.now() - listenStartRef.current;
         if (elapsed < 9500 && retryCountRef.current < MAX_RETRIES) {
-          // Retry: create a fresh SpeechRecognition instance after a short delay
           retryCountRef.current++;
           setTimeout(() => {
-            // Re-check state — user might have closed the modal
             if (!gotResultRef.current && timeoutRef.current) {
               const retrySession = startListening(
                 l,
@@ -228,35 +276,18 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                   setTranscript(text);
                   if (isFinal) {
                     gotResultRef.current = true;
-                    setState("processing");
                     if (timeoutRef.current) {
                       clearTimeout(timeoutRef.current);
                       timeoutRef.current = null;
                     }
-
-                    const intent = parseIntent(text, l);
-                    if (intent) {
-                      if (sessionRef.current) {
-                        sessionRef.current.stop();
-                        sessionRef.current = null;
-                      }
-                      setState("idle");
-                      setTranscript("");
-                      setErrorMessage("");
-                      gotResultRef.current = false;
-                      retryCountRef.current = 0;
-                      onCloseRef.current();
-                      onNavigateRef.current(intent.route, intent);
-                    } else {
-                      setState("error");
-                      setErrorMessage(`${t.notUnderstood}\n\n"${text}"`);
-                      speak(t.notUnderstood, l);
+                    if (sessionRef.current) {
+                      sessionRef.current.stop();
+                      sessionRef.current = null;
                     }
+                    processTranscript(text);
                   }
                 },
-                () => {
-                  sessionRef.current = null;
-                },
+                () => { sessionRef.current = null; },
                 (error) => {
                   if (error === "not_allowed") {
                     gotResultRef.current = true;
@@ -274,7 +305,6 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
           }, 200);
         }
       },
-      // onError
       (error) => {
         if (error === "not_allowed") {
           gotResultRef.current = true;
@@ -289,31 +319,47 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
     );
 
     sessionRef.current = session;
-  }, [l, t, cleanup]);
+  }, [l, t, processTranscript]);
+
+  // Unified begin listening
+  const beginListening = useCallback(() => {
+    if (mode === "native") {
+      beginNativeListening();
+    } else if (mode === "cloud") {
+      beginCloudListening();
+    } else {
+      setTimeout(() => textInputRef.current?.focus(), 100);
+    }
+  }, [mode, beginNativeListening, beginCloudListening]);
 
   // Start listening when modal opens
   useEffect(() => {
     if (open) {
       retryCountRef.current = 0;
-      // Warm up TTS on user gesture context
+      const detectedMode = detectVoiceMode();
+      setMode(detectedMode);
+
+      // Warm up TTS
       if (typeof window !== "undefined" && window.speechSynthesis) {
         const warmup = new SpeechSynthesisUtterance("");
         warmup.volume = 0;
         window.speechSynthesis.speak(warmup);
       }
-      if (isSpeechSupported()) {
+
+      if (detectedMode === "text") {
+        setTimeout(() => textInputRef.current?.focus(), 300);
+      } else {
         const timer = setTimeout(() => {
-          beginListening();
+          if (detectedMode === "native") beginNativeListening();
+          else beginCloudListening();
         }, 300);
         return () => clearTimeout(timer);
-      } else {
-        setSpeechAvailable(false);
-        setTimeout(() => textInputRef.current?.focus(), 300);
       }
     } else {
       cleanup();
     }
-  }, [open, beginListening, cleanup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -324,6 +370,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
 
   const isListening = state === "listening";
   const hasTranscript = transcript.length > 0;
+  const showMicUI = mode === "native" || mode === "cloud";
 
   return (
     <div
@@ -354,8 +401,8 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
         </button>
 
         <div className="flex flex-col items-center py-10 px-6">
-          {/* ── Speech Recognition Mode ── */}
-          {speechAvailable ? (
+          {/* ── Mic UI (native or cloud) ── */}
+          {showMicUI ? (
             <>
               {/* Mic Icon + Rings */}
               <div className="relative w-32 h-32 flex items-center justify-center mb-4">
@@ -367,13 +414,21 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                   </>
                 )}
 
+                {/* Tap to stop (cloud mode) — stop recording early */}
                 <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center relative z-10"
+                  className="w-20 h-20 rounded-full flex items-center justify-center relative z-10 cursor-pointer"
+                  onClick={() => {
+                    if (isListening && mode === "cloud" && recordingRef.current) {
+                      recordingRef.current.stop();
+                    }
+                  }}
                   style={{
                     background:
                       state === "error"
                         ? "linear-gradient(135deg, #dc2626, #b91c1c)"
-                        : "linear-gradient(135deg, #ffbe20, #e65100)",
+                        : state === "processing"
+                          ? "linear-gradient(135deg, #1b5bae, #1c4d8f)"
+                          : "linear-gradient(135deg, #ffbe20, #e65100)",
                     boxShadow:
                       state === "error"
                         ? "0 8px 30px rgba(220,38,38,0.4)"
@@ -386,6 +441,8 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                       <circle cx="12" cy="12" r="10" />
                       <path d="M12 8v4M12 16h.01" />
                     </svg>
+                  ) : state === "processing" ? (
+                    <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="9" y="1" width="6" height="12" rx="3" />
@@ -411,6 +468,13 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                 {state === "idle" && t.listening}
               </p>
 
+              {/* Cloud mode hint */}
+              {isListening && mode === "cloud" && !hasTranscript && (
+                <p className="text-white/30 text-[11px] text-center mb-1">
+                  {l === "te" ? "మాట్లాడి, ఆపడానికి నొక్కండి" : l === "hi" ? "बोलें, रुकने के लिए दबाएं" : "Speak, tap mic to stop"}
+                </p>
+              )}
+
               {/* Transcript / Error */}
               <div className="min-h-[60px] flex items-center justify-center text-center px-2">
                 {isListening && hasTranscript && (
@@ -418,13 +482,16 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                     &ldquo;{transcript}&rdquo;
                   </p>
                 )}
-                {isListening && !hasTranscript && (
+                {isListening && !hasTranscript && mode === "native" && (
                   <p className="text-white/40 text-sm">{t.tapToSpeak}</p>
                 )}
-                {state === "processing" && (
+                {state === "processing" && hasTranscript && (
                   <p className="text-white text-lg font-semibold leading-snug">
                     &ldquo;{transcript}&rdquo;
                   </p>
+                )}
+                {state === "processing" && !hasTranscript && (
+                  <p className="text-white/40 text-sm">{t.processing}</p>
                 )}
                 {state === "error" && (
                   <p className="text-red-300 text-sm font-medium">{errorMessage}</p>
@@ -454,7 +521,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                         cleanup();
                         setState("idle");
                         setErrorMessage("");
-                        setSpeechAvailable(false);
+                        setMode("text");
                         setTimeout(() => textInputRef.current?.focus(), 100);
                       }}
                       className="px-5 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium hover:bg-white/25 transition-colors flex items-center gap-1.5"
@@ -467,12 +534,12 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                     </button>
                   </>
                 )}
-                {!state.startsWith("error") && (
+                {state !== "error" && (
                   <button
                     onClick={() => {
                       cleanup();
                       setState("idle");
-                      setSpeechAvailable(false);
+                      setMode("text");
                       setTimeout(() => textInputRef.current?.focus(), 100);
                     }}
                     className="px-4 py-2 rounded-full bg-white/10 text-white/50 text-xs font-medium hover:bg-white/15 transition-colors flex items-center gap-1.5"
@@ -493,9 +560,8 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
               </div>
             </>
           ) : (
-            /* ── Text Input Fallback (iOS, Firefox, etc.) ── */
+            /* ── Text Input Fallback ── */
             <>
-              {/* Keyboard icon */}
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
                 style={{
@@ -511,7 +577,6 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
 
               <p className="text-white/60 text-xs text-center mb-4">{tt.voiceNotAvailable}</p>
 
-              {/* Text input */}
               <div className="w-full flex gap-2 mb-3">
                 <input
                   ref={textInputRef}
@@ -537,24 +602,24 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
                 </button>
               </div>
 
-              {/* Examples hint */}
               <p className="text-white/30 text-[11px] text-center mb-2">{tt.examples}</p>
 
-              {/* Error */}
               {errorMessage && (
                 <p className="text-red-300 text-sm font-medium text-center mt-2">{errorMessage}</p>
               )}
 
-              {/* Cancel + switch to mic */}
               <div className="mt-4 flex gap-3 justify-center">
-                {isSpeechSupported() && (
+                {detectVoiceMode() !== "text" && (
                   <button
                     onClick={() => {
-                      setSpeechAvailable(true);
+                      const detectedMode = detectVoiceMode();
+                      setMode(detectedMode);
                       setErrorMessage("");
                       setTextInput("");
                       retryCountRef.current = 0;
-                      setTimeout(() => beginListening(), 100);
+                      if (detectedMode !== "text") {
+                        setTimeout(() => beginListening(), 100);
+                      }
                     }}
                     className="px-4 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium hover:bg-white/25 transition-colors flex items-center gap-1.5"
                   >
