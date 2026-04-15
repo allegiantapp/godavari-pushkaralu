@@ -17,7 +17,7 @@ import {
 } from "@/lib/audioRecorder";
 
 type Lang = "te" | "hi" | "en";
-type VoiceState = "idle" | "listening" | "processing" | "error";
+type VoiceState = "idle" | "listening" | "processing" | "error" | "qa_answer";
 type VoiceMode = "native" | "cloud" | "text";
 
 interface VoiceModalProps {
@@ -108,6 +108,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
   const [transcript, setTranscript] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [textInput, setTextInput] = useState("");
+  const [qaAnswer, setQaAnswer] = useState<{ label: string; emoji: string; text: string } | null>(null);
   const [mode, setMode] = useState<VoiceMode>("native");
   const sessionRef = useRef<VoiceSession | null>(null);
   const recordingRef = useRef<RecordingSession | null>(null);
@@ -147,6 +148,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
     setTranscript("");
     setErrorMessage("");
     setTextInput("");
+    setQaAnswer(null);
     gotResultRef.current = false;
     retryCountRef.current = 0;
     onCloseRef.current();
@@ -159,14 +161,24 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
 
     const intent = parseIntent(text, l);
     if (intent) {
-      cleanup();
-      setState("idle");
-      setTranscript("");
-      setErrorMessage("");
-      gotResultRef.current = false;
-      retryCountRef.current = 0;
-      onCloseRef.current();
-      onNavigateRef.current(intent.route, intent);
+      if (intent.route === null) {
+        // Q&A intent — speak the answer, show it in modal, do NOT navigate
+        cleanup();
+        const answerText = intent.dataResponse[l];
+        setQaAnswer({ label: intent.label[l], emoji: intent.emoji, text: answerText });
+        setState("qa_answer");
+        speak(answerText, l, intent.dataResponse["en"]);
+      } else {
+        // Navigation intent — close modal and navigate
+        cleanup();
+        setState("idle");
+        setTranscript("");
+        setErrorMessage("");
+        gotResultRef.current = false;
+        retryCountRef.current = 0;
+        onCloseRef.current();
+        onNavigateRef.current(intent.route as string, intent);
+      }
     } else {
       setState("error");
       setErrorMessage(`${t.notUnderstood}\n\n"${text}"`);
@@ -181,9 +193,20 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
 
     const intent = parseIntent(text, l);
     if (intent) {
-      setTextInput("");
-      onCloseRef.current();
-      onNavigateRef.current(intent.route, intent);
+      if (intent.route === null) {
+        // Q&A intent — show answer in modal
+        const answerText = intent.dataResponse[l];
+        setQaAnswer({ label: intent.label[l], emoji: intent.emoji, text: answerText });
+        setState("qa_answer");
+        setTextInput("");
+        setErrorMessage("");
+        speak(answerText, l, intent.dataResponse["en"]);
+      } else {
+        // Navigation intent
+        setTextInput("");
+        onCloseRef.current();
+        onNavigateRef.current(intent.route as string, intent);
+      }
     } else {
       setErrorMessage(`${t.notUnderstood}\n\n"${text}"`);
     }
@@ -371,6 +394,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
   const isListening = state === "listening";
   const hasTranscript = transcript.length > 0;
   const showMicUI = mode === "native" || mode === "cloud";
+  const showQaAnswer = state === "qa_answer" && qaAnswer;
 
   return (
     <div
@@ -401,8 +425,59 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
         </button>
 
         <div className="flex flex-col items-center py-10 px-6">
-          {/* ── Mic UI (native or cloud) ── */}
-          {showMicUI ? (
+          {/* ── Q&A Answer Display ── */}
+          {showQaAnswer ? (
+            <>
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl"
+                style={{
+                  background: "linear-gradient(135deg, #1b5bae, #1c4d8f)",
+                  boxShadow: "0 8px 30px rgba(27,91,174,0.4)",
+                }}
+              >
+                {qaAnswer.emoji}
+              </div>
+
+              <p className="text-saffron-400 text-sm font-bold uppercase tracking-wider mb-3">
+                {qaAnswer.label}
+              </p>
+
+              <div className="max-h-[200px] overflow-y-auto px-1 mb-4 scrollbar-thin">
+                <p className="text-white text-sm leading-relaxed text-center">
+                  {qaAnswer.text}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-3 mt-2">
+                <button
+                  onClick={() => {
+                    setQaAnswer(null);
+                    retryCountRef.current = 0;
+                    if (mode === "text") {
+                      setState("idle");
+                      setTimeout(() => textInputRef.current?.focus(), 100);
+                    } else {
+                      beginListening();
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #ffbe20, #e65100)",
+                    color: "white",
+                    boxShadow: "0 4px 15px rgba(230,81,0,0.3)",
+                  }}
+                >
+                  {l === "te" ? "మరో ప్రశ్న" : l === "hi" ? "और पूछें" : "Ask Another"}
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="px-5 py-2.5 rounded-full bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors"
+                >
+                  {t.cancel}
+                </button>
+              </div>
+            </>
+          ) : showMicUI ? (
             <>
               {/* Mic Icon + Rings */}
               <div className="relative w-32 h-32 flex items-center justify-center mb-4">

@@ -89,7 +89,7 @@ export default function VoiceModal({ lang, open, onClose, onNavigate }: VoiceMod
             setState("result");
             speak(intent.confirmation[l], l).then(() => {
               setTimeout(() => {
-                onNavigate(intent.route);
+                onNavigate(intent.route as string);
                 handleClose();
               }, 800);
             });

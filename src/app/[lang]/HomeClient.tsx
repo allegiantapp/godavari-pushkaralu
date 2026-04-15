@@ -34,6 +34,8 @@ const translations = {
     crowdStatus: "రద్దీ స్థితి",
     map: "మ్యాప్",
     volunteer: "వాలంటీర్",
+    pujaTimings: "పూజా సమయాలు",
+    safetyTips: "సేఫ్టీ టిప్స్",
     feedback: "అభిప్రాయం",
     admin: "అడ్మిన్",
     currentAlert: "ప్రస్తుత హెచ్చరిక",
@@ -62,6 +64,8 @@ const translations = {
     crowdStatus: "भीड़ स्थिति",
     map: "नक्शा",
     volunteer: "स्वयंसेवक",
+    pujaTimings: "पूजा समय",
+    safetyTips: "सुरक्षा सुझाव",
     feedback: "फीडबैक",
     admin: "एडमिन",
     currentAlert: "वर्तमान अलर्ट",
@@ -89,6 +93,8 @@ const translations = {
     crowdStatus: "Crowd Status",
     map: "Map",
     volunteer: "Volunteer",
+    pujaTimings: "Puja Timings",
+    safetyTips: "Safety Tips",
     feedback: "Feedback",
     admin: "Admin",
     currentAlert: "Current Alert",
@@ -112,9 +118,9 @@ const quickAccessItems = [
   { key: "alerts", href: "alerts", emoji: "📢", bg: "bg-rose-50", text: "text-rose-800" },
   { key: "map", href: "map", emoji: "📍", bg: "bg-emerald-50", text: "text-emerald-800" },
   { key: "emergency", href: "emergency", emoji: "🆘", bg: "bg-red-50", text: "text-red-800" },
+  { key: "pujaTimings", href: "puja-timings", emoji: "🪔", bg: "bg-amber-50", text: "text-amber-800" },
+  { key: "safetyTips", href: "safety-tips", emoji: "🛡️", bg: "bg-green-50", text: "text-green-800" },
   { key: "feedback", href: "feedback", emoji: "💬", bg: "bg-purple-50", text: "text-purple-800" },
-  { key: "volunteer", href: "facilities?type=volunteer", emoji: "🤝", bg: "bg-green-50", text: "text-green-800" },
-  { key: "admin", href: "admin", emoji: "⚙️", bg: "bg-slate-50", text: "text-slate-800" },
 ];
 
 export default function HomeClient({ lang }: { lang: string }) {
